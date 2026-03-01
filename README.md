@@ -2,7 +2,7 @@
 
 Cineflix is a professional content-based movie recommendation system designed to help users discover their next favorite movies. It leverages NLP techniques like TF-IDF and cosine similarity to recommend movies based on metadata content such as titles, overviews, and genres.
 
-🌐 Live App: https://movierecommendersystem-m6kgybz8shrfnj8k6ne9cd.streamlit.app/
+🌐 Live App: https://movierecommendationsystem-n5gnzhmlbsgmi38huet8n8.streamlit.app/
 
 ---
 
