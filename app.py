@@ -5,6 +5,8 @@ from difflib import get_close_matches
 from concurrent.futures import ThreadPoolExecutor
 import time
 import os
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 # ================= PAGE CONFIG =================
 st.set_page_config(
@@ -80,6 +82,17 @@ download_from_drive(similarity_file_id, "artifacts/similarity.pkl")
 # ================= LOAD FILES =================
 movies = pickle.load(open('artifacts/movies.pkl', 'rb'))
 similarity = pickle.load(open('artifacts/similarity.pkl', 'rb'))
+# ================= NLP TAGS =================
+# ================= NLP TAGS =================
+if 'tags' not in movies.columns:
+    # Combine title + genres + overview + cast + director for richer NLP context
+    movies['tags'] = (
+        movies['title'].fillna('') + ' ' +
+        movies['genres'].fillna('') + ' ' +
+        movies['overview'].fillna('') + ' ' +
+        movies['cast'].fillna('') + ' ' +
+        movies['director'].fillna('')
+    )
 
 API_KEY = "1506589622ad1e20c44c36f4ae8d32ae"
 session = requests.Session()
@@ -115,6 +128,14 @@ st.markdown("""
     <div class="hero-sub">Search for any movie and discover personalized recommendations</div>
 </div>
 """, unsafe_allow_html=True)
+# ================= NLP MODEL =================
+@st.cache_data
+def create_nlp_model():
+    tfidf = TfidfVectorizer(stop_words='english')
+    vectors = tfidf.fit_transform(movies['tags'])
+    return tfidf, vectors
+
+tfidf, movie_vectors = create_nlp_model()
 
 # ================= FETCH FUNCTIONS =================
 @st.cache_data(show_spinner=False)
@@ -161,51 +182,94 @@ def get_trending_fast():
             trending.append((movie.title, poster, rating, trailer, watch_link))
         idx += 1
     return trending
-
 # ================= RECOMMEND FUNCTION =================
-def recommend(movie):
-    if movie not in movies['title'].values:
-        closest = get_close_matches(movie, movies['title'].values, n=1, cutoff=0.6)
-        if closest:
-            movie = closest[0]
-        else:
-            return [], [], [], [], []
+def recommend_nlp_by_movie(selected_movie, top_n=10):
+    movie_idx = movies[movies['title'] == selected_movie].index[0]
+    movie_tag = movies.iloc[movie_idx]['tags']
 
-    index = movies[movies['title'] == movie].index[0]
-    distances = similarity[index]
-    movie_list = sorted(list(enumerate(distances)), reverse=True, key=lambda x: x[1])[1:30]
+    movie_vec = tfidf.transform([movie_tag])
+    similarity_scores = cosine_similarity(movie_vec, movie_vectors)[0]
+
+    scores = list(enumerate(similarity_scores))
+    scores = sorted(scores, key=lambda x: x[1], reverse=True)
 
     names, posters, ratings, trailers, watch_links = [], [], [], [], []
 
-    def fetch_all(i):
+    for i, score in scores:
+        if movies.iloc[i]['title'] == selected_movie:
+            continue
+        movie_id = movies.iloc[i].movie_id
+        poster, rating, _, _ = fetch_movie_details(movie_id)
+        trailer = fetch_trailer(movie_id)
+        watch_link = f"https://www.google.com/search?q={movies.iloc[i].title}+watch+online"
+
+        if poster:
+            names.append(movies.iloc[i].title)
+            posters.append(poster)
+            ratings.append(rating)
+            trailers.append(trailer)
+            watch_links.append(watch_link)
+
+        if len(names) >= top_n:
+            break
+
+    return names, posters, ratings, trailers, watch_links
+def recommend_by_query(query):
+    query = query.lower()
+
+    query_vec = tfidf.transform([query])
+    similarity_scores = cosine_similarity(query_vec, movie_vectors)
+
+    scores = list(enumerate(similarity_scores[0]))
+    scores = sorted(scores, key=lambda x: x[1], reverse=True)[:10]
+
+    names, posters, ratings, trailers, watch_links = [], [], [], [], []
+
+    for i in scores:
         movie_id = movies.iloc[i[0]].movie_id
         poster, rating, _, _ = fetch_movie_details(movie_id)
         trailer = fetch_trailer(movie_id)
         watch_link = f"https://www.google.com/search?q={movies.iloc[i[0]].title}+watch+online"
-        return i, poster, rating, trailer, watch_link
 
-    with ThreadPoolExecutor(max_workers=10) as executor:
-        results = executor.map(fetch_all, movie_list)
-
-    for result in results:
-        i, poster, rating, trailer, watch_link = result
         if poster:
             names.append(movies.iloc[i[0]].title)
             posters.append(poster)
             ratings.append(rating)
             trailers.append(trailer)
             watch_links.append(watch_link)
-        if len(names) >= 10:
-            break
 
     return names, posters, ratings, trailers, watch_links
 
 # ================= SEARCH =================
+# ================= SEARCH =================
 movie_list = ["Type here to search..."] + movies['title'].tolist()
 
-selected_movie = st.selectbox("🔍 Movie Search", movie_list)
+search_type = st.radio("Search Type", ["Movie Name", "Describe Movie (NLP)"])
 
-if selected_movie == "Type here to search...":
+if search_type == "Movie Name":
+    selected_movie = st.selectbox("🔍 Movie Search", movie_list)
+    if selected_movie == "Type here to search...":
+        selected_movie = ""
+
+else:
+    user_query = st.text_input("💬 Describe the movie (e.g., action war movie)")
+
+    if user_query:
+        names, posters, ratings, trailers, watch_links = recommend_by_query(user_query)
+
+        st.subheader("🎯 NLP Recommendations")
+        cols = st.columns(5)
+
+        for i in range(min(5, len(names))):
+            with cols[i]:
+                st.markdown('<div class="card">', unsafe_allow_html=True)
+                st.image(posters[i], use_container_width=True)
+                st.caption(names[i])
+                st.write(f"⭐ {ratings[i]}")
+                st.link_button("▶ Watch Trailer", trailers[i])
+                st.link_button("🍿 Where to Watch", watch_links[i])
+                st.markdown('</div>', unsafe_allow_html=True)
+
     selected_movie = ""
 
 # ================= MAIN DISPLAY =================
@@ -272,7 +336,7 @@ else:
 
     # ================= SIMILAR MOVIES =================
     st.subheader("✨ Similar Movies")
-    names, posters, ratings, trailers, watch_links = recommend(selected_movie)
+    names, posters, ratings, trailers, watch_links = recommend_nlp_by_movie(selected_movie)
 
     visible = min(st.session_state.visible_count, len(names))
 
