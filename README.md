@@ -270,9 +270,10 @@ The NLP-based recommendation model achieved the highest accuracy among the evalu
 ---
 
 ## 📸 Screenshots
-### 🏠 Splash screen
 
-![Splash screen](screenshots/splash screen.png)
+### 🎬 Splash Screen
+
+![Splash Screen](screenshots/splash_screen.png)
 
 ### 🏠 Home Page
 
@@ -280,11 +281,12 @@ The NLP-based recommendation model achieved the highest accuracy among the evalu
 
 ### 🔥 Trending Movies
 
-![Trending Movies](screenshots/trending movies.png)
+![Trending Movies](screenshots/trending_movies.png)
 
 ### 🎥 Movie Recommendations
 
-![Movie Recommendations](screenshots/movie search.png)
+![Movie Recommendations](screenshots/movie_search.png)
+
 
 ### 🧠 NLP-Based Recommendations
 
