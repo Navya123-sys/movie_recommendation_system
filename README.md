@@ -271,6 +271,7 @@ The NLP-based recommendation model achieved the highest accuracy among the evalu
 
 ## 📸 Screenshots
 ### 🏠 Splash screen
+
 ![Splash screen](screenshots/splash screen.png)
 
 ### 🏠 Home Page
