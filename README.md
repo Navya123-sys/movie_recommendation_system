@@ -279,7 +279,7 @@ The NLP-based recommendation model achieved the highest accuracy among the evalu
 
 ### 🔥 Trending Movies
 
-![Trending Movies](screenshots/trending.png)
+![Trending Movies](screenshots/trending movies.png)
 
 ### 🎥 Movie Recommendations
 
